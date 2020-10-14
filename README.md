@@ -16,7 +16,7 @@ Before contributing to this repository please make sure that the dataset you are
 
 * Add your dataset as a csv in a directory `datasets/{name_of_the_dataset}/data.csv`.
 * To specify an accuracy function to evaluate it with and other parameters edit `datasets/{name_of_the_dataset}/info.py`, see [this file as an example](datasets/automobile_insurance/info.py).
-* To add an "alternatives" benchmark for the dataset add it to `alternatives/{alternative_name}/{name_of_the_dataset}/benchmark.py`. Currently the supported alternatives are sklearn_expert and sklearn_naive. For an example see [this file](alternatives/sklearn_expert/home_rentals/benchmark.py).
+* To add an "alternatives" benchmark for the dataset add it to `alternatives/{alternative_name}/{name_of_the_dataset}/benchmark.py`. Currently the supported alternatives are sklearn_expert and sklearn_naive. For an example see [this file](alternatives/sklearn/home_rentals/benchmark.py).
 
 ### Issues
 
