@@ -6,4 +6,4 @@ speed = 'medium'
 active = True
 accuracy_function = r2_score
 confidence_function = confidence_from_range_v1
-target = 'Hotel Reviews'
+target = 'rating'
