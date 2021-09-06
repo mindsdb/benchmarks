@@ -1,8 +1,0 @@
-{
-  "mysql": {
-    "host": "HOST_ADDRESS"
-    ,"user": "USER_NAME"
-    ,"password": "HOST_PASSWORD"
-    ,"database": "DATABASE_NAME"
-  }
-}
