@@ -1,0 +1,8 @@
+Last updated: 2021.02.09
+
+Tripadvisor hotel reviews dataset
+
+from: https://www.kaggle.com/andrewmvd/trip-advisor-hotel-reviews
+
+** This file is a classification problem where ratings of 1-3 have been mapped to a 'negative' label and 4-5 are 'positive' *** 
+

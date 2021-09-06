@@ -2,4 +2,6 @@
 *catboost_info*
 *logs.log*
 */debug.out
-.DS_Store
+repos
+*.pyc
+benchmarks/datasets/job_salary/data.csv

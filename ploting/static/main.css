@@ -1,0 +1,52 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    padding: 20px;
+    background-color: #f9f9f9;
+}
+
+h1 {
+    font-family: Arial, Helvetica;
+    color: #2AB673;
+}
+
+h2 {
+    font-family: Arial, Helvetica;
+}
+
+h3 {
+    font-family: Arial, Helvetica;
+    color: #444;
+}
+
+.chart {
+    padding: 12px;
+    max-width: 760px;
+    min-width: 760px;
+    border: 1px solid #999;
+    min-height: 350px;
+    max-height: 350px;
+}
+
+nav {
+    display: flex;
+    flex-direction: row;
+}
+
+nav > *:not(:last-child) {
+    margin-right: 16px;
+}
+
+nav > * {
+    text-decoration: none;
+    font-size: 18px;
+    font-weight: 400;
+    color: #000;
+}
+
+nav > *:hover {
+    color: #666;
+}

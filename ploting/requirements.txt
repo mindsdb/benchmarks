@@ -1,0 +1,5 @@
+flask
+flask_basicauth
+matplotlib
+seaborn
+mpld3

@@ -1,0 +1,19 @@
+Last updated: 2021.02.09
+
+This is a regression test
+
+Wine Reviews dataset from kaggle:
+
+https://www.kaggle.com/zynicide/wine-reviews?select=winemag-data_first150k.csv
+
+archive/ contains json and .csv
+
++ archive/winemag-data-130k-v2.csv - winereviews-2.csv; contains taster name and twitter handle
++ archive/winemag-data-first150k.csv - original dataset
++ archive/benchmark_winereviews.csv is the dataset found in mindsdb public benchmarks
+
+the csv file in the current director is of benchmark_winereviews.csv as this is the smallest dataset
+there is a json file that corresponds to winemag-data-130k-v2.csv
+data.csv is from benchmarks 
+
+all datasets have been filtered for duplicates such that each row is unique.

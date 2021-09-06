@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmarks</title>
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+    
+    <nav>
+        <a href="/mindsdb_accuracy">mindsdb_accuracy</a>
+        <a href="/compare_lightwood_w_native">compare_lightwood_w_native</a>
+    </nav>
+
+    <h1>Benchmarks</h1>
+    {% for ds in datasets %}
+        <h2>{{ ds }}</h2>
+        {% for af in datasets[ds] %}
+            <h3>{{ af }}</h3>
+            <div style="display: flex; flex-direction: column; width: 100%;">
+                <canvas id="acc_chart_{{ ds }}_{{ af }}" class="chart" style="margin-bottom: 20px;"></canvas>
+            </div>
+            <script>
+                acc_datasets = [];
+                {% if datasets[ds][af] %}
+                    {% if datasets[ds][af]|length == 1 %}
+                        labels = [];
+                        acc_datasets.push({
+                            label: "{{ datasets[ds][af][0]['{0}'.format(x_axis_key)] }}",
+                            fill: false,
+                            backgroundColor: "#2AB673",
+                            borderColor: "#2AB673",
+                            data: [
+                                {{ datasets[ds][af][0]['{0}'.format(y_axis_key)] }},
+                                {{ datasets[ds][af][0]['{0}'.format(y_axis_key)] }}
+                            ]
+                        });
+                    {% else %}
+                        labels = {{ datasets[ds][af]|map(attribute='{0}'.format(x_axis_key))|list|safe }};
+                        acc_datasets.push({
+                            label: "",
+                            fill: false,
+                            backgroundColor: "#2AB673",
+                            borderColor: "#2AB673",
+                            data: {{ datasets[ds][af]|map(attribute='{0}'.format(y_axis_key))|list|safe }}
+                        });
+                    {% endif %}
+                {% else %}
+                    labels = [];
+                {% endif %}
+
+                new Chart(document.getElementById("acc_chart_{{ ds }}_{{ af }}").getContext("2d"), {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: acc_datasets
+                    },
+                    options: {
+                        legend: {
+                            display: false
+                        },
+                        elements: {
+                            line: {
+                                tension: 0
+                            }
+                        },
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    suggestedMin: 0,
+                                    suggestedMax: 1
+                                }
+                            }]
+                        }
+                    }
+                });
+
+            </script>
+        {% endfor %}
+    {% endfor %}
+
+</body>
+</html>

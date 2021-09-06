@@ -1,0 +1,6 @@
+Last updated: 2021.02.09
+Tripadvisor hotel reviews dataset
+
+from: https://www.kaggle.com/andrewmvd/trip-advisor-hotel-reviews
+
+Note, that I converted the 'rating' category into a str type; otherwise, lightwood reads this score as numeric.

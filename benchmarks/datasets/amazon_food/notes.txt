@@ -1,0 +1,10 @@
+#Last updated:2021.02.12
+
+Amazon fine food reviews: https://www.kaggle.com/snap/amazon-fine-food-reviews
+
+This is a really good test set for the GPT-3 API too as it creates a summarized text form. We can see how similar semantically GPT-3 comes to the summarized text.
+
+The following comments are omitted:
+
+The current data.csv corresponds to: orig_data/data_textonly.csv
+This is because I want to see how raw-text performs in predicting the target rating.
