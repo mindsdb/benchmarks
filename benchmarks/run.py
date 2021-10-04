@@ -17,60 +17,28 @@ import numpy as np
 from benchmarks.helpers.accuracy import requires_normal_predictions
 import torch
 import random
-
+import datetime
 
 CURRENT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
 DATASETS_DIR = os.path.join(CURRENT_DIR, os.path.join('benchmarks','datasets'))
-
-
-def fit_and_infer_w_native(df_train: pd.DataFrame, df_test: pd.DataFrame, problem_definition: object) -> Tuple[list, list, float]:
-    import mindsdb_native
-    from mindsdb_native.libs.constants.mindsdb import DATA_TYPES, DATA_SUBTYPES
-    
-    started = time.time()
-
-    predictor = mindsdb_native.Predictor(name='a_random_name')
-
-    learn_kwargs = {}
-    if 'timeseries_settings' in problem_definition:
-        learn_kwargs['timeseries_settings'] = problem_definition['timeseries_settings']
-    learn_kwargs['advanced_args'] = {}
-    learn_kwargs['advanced_args']['deduplicate_data'] = False
-    learn_kwargs['advanced_args']['force_predict'] = True
-    learn_kwargs['advanced_args']['debug'] = True
-    learn_kwargs['advanced_args']['disable_column_importance'] = True
-
-    predictor.learn(from_data=df_train, to_predict=problem_definition['target'], **learn_kwargs)
-
-    target = problem_definition['target']
-    try:
-        df_test = df_test[df_test['make_predictions']]
-    except KeyError:
-        pass
-
-    real_values = [x for x in df_test[target]]
-        
-    raw_predictions = predictor.predict(when_data=df_test)
-    predictions = [x.explanation for x in raw_predictions]
-    predictions = [x[target]['predicted_value'] for x in predictions]
-
-    if predictor.transaction.lmd['stats_v2'][target]['typing']['data_type'] == DATA_TYPES.CATEGORICAL:
-        predictions = [str(x) for x in predictions]
-        real_values = [str(x) for x in real_values]
-    elif predictor.transaction.lmd['stats_v2'][target]['typing']['data_subtype'] == DATA_SUBTYPES.INT:
-        predictions = [int(x) for x in predictions]
-        real_values = [int(x) for x in real_values]
-    elif predictor.transaction.lmd['stats_v2'][target]['typing']['data_subtype'] == DATA_SUBTYPES.FLOAT:
-        predictions = [float(x) for x in predictions]
-        real_values = [float(x) for x in real_values]
-
-    return predictions, real_values, int(time.time() - started)
 
 
 def fit_and_infer_w_lightwood(df_train: pd.DataFrame, df_test: pd.DataFrame, problem_definition: object) -> Tuple[list, list, float]:
     import lightwood
     from lightwood import dtype
     from lightwood.api.high_level import predictor_from_problem
+
+    def to_typed_list(lst: List, dtype: type) -> List:
+        """
+        Cast list of predictions to the specified `dtype`.
+        For list of lists, apply the casting on each sublist element.
+        """
+        lst = list(lst)
+        if not isinstance(lst[0], list):
+            lst = [dtype(l) for l in lst]
+        else:
+            lst = [[dtype(l) for l in subl] for subl in lst]
+        return lst
     
     started = time.time()
     predictor: lightwood.PredictorInterface = predictor_from_problem(df_train, problem_definition)
@@ -87,14 +55,14 @@ def fit_and_infer_w_lightwood(df_train: pd.DataFrame, df_test: pd.DataFrame, pro
     real_values = df_test[target]
 
     if predictor.dtype_dict[target] in (dtype.categorical, dtype.binary):
-        predictions = [str(x) for x in predictions]
-        real_values = [str(x) for x in real_values]
+        predictions = to_typed_list(predictions, str)
+        real_values = to_typed_list(real_values, str)
     elif predictor.dtype_dict[target] in (dtype.integer):
-        predictions = [int(x) for x in predictions]
-        real_values = [int(x) for x in real_values]
+        predictions = to_typed_list(predictions, int)
+        real_values = to_typed_list(real_values, int)
     elif predictor.dtype_dict[target] in (dtype.float):
-        predictions = [float(x) for x in predictions]
-        real_values = [float(x) for x in real_values]
+        predictions = to_typed_list(predictions, float)
+        real_values = to_typed_list(real_values, float)
 
     return predictions, real_values, int(time.time() - started)
 
@@ -105,22 +73,30 @@ def setup_args():
     parser.add_argument('--datasets', type=str, default=None) # comma separated lists of datasets to run | special values: openml runs all openml datasets
     parser.add_argument('--lightwood', type=str, default=None) # env | #latest | branch name | commit hash | None
     parser.add_argument('--use_ray', type=str, default='1') # 1 to use, 0 to not use
-    parser.add_argument('--use_native', type=str, default='0') # 1 to use, 0 to not use
+    parser.add_argument('--use_db', type=str, default='1') # 1 to use, 0 to not use
+    parser.add_argument('--is_dev', type=str, default='1') # 1 to use, 0 to not use
 
     args, unknown = parser.parse_known_args()
     if len(unknown) > 0:
         print(f'Unknown arguments: {unknown}')
         exit()
     
-    if args.use_ray in (False, 'false', 'False', 0, '0'):
+    false_values = (False, 'false', 'False', 0, '0')
+
+    if args.use_ray in false_values:
         args.use_ray = False
     else:
         args.use_ray = True
 
-    if args.use_native in (False, 'false', 'False', 0, '0'):
-        args.use_native = False
+    if args.use_db in false_values:
+        args.use_db = False
     else:
-        args.use_native = True
+        args.use_db = True
+
+    if args.is_dev in false_values:
+        args.is_dev = False
+    else:
+        args.is_dev = True
 
     if args.datasets is not None:
         args.datasets = args.datasets.split(',')
@@ -217,22 +193,25 @@ def ds_to_folds(ds: DatasetInterface, num_folds: int) -> List[pd.DataFrame]:
     return folds
 
 
-def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dict, lightwood_commit: str, is_dev: bool, use_native: bool):
+def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dict, lightwood_commit: str, is_dev: bool, use_db: bool):
     try:
         print('=' * 6 + f'Running for dataset {ds.name}' + '=' * 6)
 
-        skip = True
-        for acc_func in ds.accuracy_functions:
-            if acc_func not in requires_normal_predictions:
-                continue
-            found = False
-            for (ad_dataset_name, ad_accuracy_function), res_arr in accuracy_data.items():
-                if acc_func.__name__ == ad_accuracy_function and ad_dataset_name == ds.name:
-                    for res in res_arr:
-                        if res['lightwood_commit'] == lightwood_commit and res['lightwood_version'] == lightwood_version:
-                            found = True
-            if not found:
-                skip = False
+        if use_db:
+            skip = True
+            for acc_func in ds.accuracy_functions:
+                if acc_func not in requires_normal_predictions:
+                    continue
+                found = False
+                for (ad_dataset_name, ad_accuracy_function), res_arr in accuracy_data.items():
+                    if acc_func.__name__ == ad_accuracy_function and ad_dataset_name == ds.name:
+                        for res in res_arr:
+                            if res['lightwood_commit'] == lightwood_commit and res['lightwood_version'] == lightwood_version:
+                                found = True
+                if not found:
+                    skip = False
+        else:
+            skip = False
 
         if skip:
             print(f'\n============\n\nSkipping dataset {ds.name} since it already ran for the same version and commit hash\n===========\n\n')
@@ -257,14 +236,10 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
 
         accuracy_map = {}
         accuracy_map_per_fold = {}
-        if use_native:
-            fit_and_infer = fit_and_infer_w_native
-        else:
-            fit_and_infer = fit_and_infer_w_lightwood
 
         if 'timeseries' in ds.tags:
             df_train, df_test = ts_ds_to_train_test(ds)
-            predictions, real_values, runtime = fit_and_infer(df_train, df_test, problem_definition)
+            predictions, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
             for accuracy_function in ds.accuracy_functions:
                 if accuracy_function not in requires_normal_predictions:
                     continue
@@ -272,7 +247,7 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
         
         elif ds.num_folds is None:
             folds = ds_to_folds(ds, 5)
-            predictions, real_values, runtime = fit_and_infer(pd.concat(folds[:4]), folds[4], problem_definition)
+            predictions, real_values, runtime = fit_and_infer_w_lightwood(pd.concat(folds[:4]), folds[4], problem_definition)
             for accuracy_function in ds.accuracy_functions:
                 if accuracy_function not in requires_normal_predictions:
                     continue
@@ -283,7 +258,7 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
             for i in range(len(folds)):
                 df_test = folds[i]
                 df_train = pd.concat(folds[:i] + folds[i+1:])
-                predictions, real_values, runtime = fit_and_infer(df_train, df_test, problem_definition)
+                predictions, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
                 
                 for accuracy_function in ds.accuracy_functions:
                     if accuracy_function not in requires_normal_predictions:
@@ -305,20 +280,29 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
 
             q = 'INSERT INTO benchmarks.v4 (dataset, accuracy, accuracy_function, runtime, lightwood_version, lightwood_commit, is_dev, num_folds, accuracy_per_fold) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)'
 
-            con, cur, _ = get_mysql()
-            cur.execute(q, (
-                ds.name,
-                accuracy,
-                accuracy_function_name,
-                runtime,
-                lightwood_version,
-                lightwood_commit,
-                is_dev,
-                ds.num_folds,
-                accuracy_per_fold
-            ))
-            con.commit()
-            con.close()
+            if use_db:
+                con, cur, _ = get_mysql()
+                cur.execute(q, (
+                    ds.name,
+                    accuracy,
+                    accuracy_function_name,
+                    runtime,
+                    lightwood_version,
+                    lightwood_commit,
+                    is_dev,
+                    ds.num_folds,
+                    accuracy_per_fold
+                ))
+                con.commit()
+                con.close()
+            with open('REPORT.md', 'a') as fp:
+                fp.write(f'\n\n### {ds.name}  -  {accuracy_function_name}')
+                fp.write(f'\nAccuracy: {accuracy}')
+                fp.write(f'\nRuntime : {runtime}')
+                fp.write(f'\nCommit : {lightwood_commit}')
+                fp.write(f'\nVersion : {lightwood_version}')
+                fp.write(f'\nNum folds : {ds.num_folds}')
+                fp.write(f'\nPer-fold accuracy : {accuracy_per_fold}')
 
         print(f'Inserted results for dataset {ds.name}')
     except Exception as e:
@@ -327,44 +311,44 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
 
 
 @ray.remote(num_gpus=0.5)
-def run_datasets_remote(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, use_native: bool):
-    return run_dataset(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, use_native)
+def run_datasets_remote(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, use_db):
+    return run_dataset(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, use_db)
 
 
 def main():
-    setup_mysql()
     args = setup_args()
+
+    if args.use_db:
+        setup_mysql()
+
+    with open('REPORT.md', 'w') as fp:
+        now = str(datetime.datetime.now()).split('.')[0]   
+        fp.write(f'# Benchmark report\n\nRan on: {now}\nDatasets: {[x.name for x in args.datasets]}')
+
     print('=' * 20)
     
     print(f'Running benchmarks on {len(args.datasets)} datasets')
 
-    if args.use_native:
-        lightwood_version = 'Native 2.48.0'
-        lightwood_commit = 'Native 2.48.0'
-        is_dev = False
+    if args.lightwood is None:
+        raise Exception('Please specify lightwood version unless comparing!')
+    elif args.lightwood == '#env':
+        lightwood_commit = get_commit()
+    elif args.lightwood == '#latest':
+        assert 0 == os.system('pip3 install lightwood')
+        lightwood_commit = 'unknown'
+    elif args.lightwood is not None:
+        assert 0 == os.system('pip3 install git+git://github.com/mindsdb/lightwood.git@{args.lightwood}')
+        lightwood_commit = args.lightwood
     else:
-        # @TODO: Run lightwood here
-        if args.lightwood is None:
-            raise Exception('Please specify lightwood version unless comparing!')
-        elif args.lightwood == '#env':
-            lightwood_commit = get_commit()
-            is_dev = True
-        elif args.lightwood == '#latest':
-            assert 0 == os.system('pip3 install lightwood')
-            lightwood_commit = 'unknown'
-            is_dev = False
-        elif args.lightwood is not None:
-            assert 0 == os.system('pip3 install git+git://github.com/mindsdb/lightwood.git@{args.lightwood}')
-            lightwood_commit = args.lightwood
-            is_dev = True
-        else:
-            raise Exception('Please specify lightwood version unless comparing!')
+        raise Exception('Please specify lightwood version unless comparing!')
 
-        import lightwood
-        importlib.reload(lightwood)
-        lightwood_version = lightwood.__version__
+    import lightwood
+    importlib.reload(lightwood)
+    lightwood_version = lightwood.__version__
 
-    accuracy_data = Framework_lightwood().get_accuracy_groups()
+    accuracy_data = None
+    if args.use_db:
+        accuracy_data = Framework_lightwood().get_accuracy_groups()
 
     from lightwood.helpers.device import get_devices
     _, nr_gpus = get_devices()
@@ -377,7 +361,7 @@ def main():
                 num_ready = i - nr_gpus * 2
                 ray.wait(ray_obj_ids, num_returns=num_ready)
 
-            obj_id = run_datasets_remote.remote(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, args.use_native)
+            obj_id = run_datasets_remote.remote(ds, lightwood_version, accuracy_data, lightwood_commit, args.is_dev, args.use_db)
             ray_obj_ids.append(obj_id)
         
         for obj_id in ray_obj_ids:
@@ -385,10 +369,9 @@ def main():
         ray.shutdown()
     else:
         for i, ds in enumerate(args.datasets):
-            run_dataset(ds, lightwood_version, accuracy_data, lightwood_commit, is_dev, args.use_native)
+            run_dataset(ds, lightwood_version, accuracy_data, lightwood_commit, args.is_dev, args.use_db)
 
     print('=' * 20)
-    
 
 
 if __name__ == '__main__':

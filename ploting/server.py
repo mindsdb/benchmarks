@@ -16,7 +16,7 @@ def index():
 def compare(first, second):
     # @TODO Add special "stable" case for comparing against the best accuracies across all of lightwood
     if first == 'best':
-        first_group = Framework_lightwood().get_accuracy_groups()
+        first_group = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
     elif len(first.split('.')) == 3:
         first_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': first})
     else:
@@ -95,7 +95,7 @@ def compare(first, second):
     relative_total_improvement = round(relative_total_improvement, 2)
 
     release = ' No'
-    if relative_total_improvement >= 0 and total_improvement >= 0 and len(worst) == 0 and len(missing) == 0:
+    if relative_total_improvement >= -5 and total_improvement >= 0 and len(worst) == 0 and len(missing) == 0:
         release = 'Yes'
 
     if request.args.get('release_only', False):
@@ -137,10 +137,10 @@ def vers_sort(item):
 
     return int(item['lightwood_version'].replace('.', '')) * pow(10, 12) + item['ran_at'].timestamp()
 
+
 @app.route('/accuracy_plots')
 def accuracy_plots():
-    groups = Framework_lightwood().get_accuracy_groups()
-    print(groups)
+    groups = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
     dct = {}
     for ds in list(set(g[0] for g in groups)):
         dct[ds] = {}
