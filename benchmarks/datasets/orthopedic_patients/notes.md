@@ -1,6 +1,6 @@
 # Biomechanical features of orthopedic patients
 
-Kaggle data: https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients?select=column_2C_weka.csv
+Kaggle data: https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients
 
 # Description:
 
