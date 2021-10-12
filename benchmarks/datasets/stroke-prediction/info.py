@@ -7,7 +7,7 @@ class Dataset(DatasetInterface):
     license = 'CC0: Public Domain'
     is_open_license = True
     accuracy_functions = [balanced_accuracy_score]
-    file = 'healthcare-dataset-stroke-data.csv'
+    file = 'data.csv'
     active = True
     target = 'stroke'
     source = 'https://www.kaggle.com/fedesoriano/stroke-prediction-dataset'
