@@ -1,4 +1,4 @@
-# Concrete Compressive Strength Dataset
+# Glass classification dataset
 
 Kaggle data: https://www.kaggle.com/uciml/glass
 
@@ -6,7 +6,7 @@ Kaggle data: https://www.kaggle.com/uciml/glass
 This is a Glass Identification Data Set from UCI. It contains 10 attributes including id. The response is glass type(discrete 7 values)
 
 
-# Input variables (name, measurement):
+# Input variables:
 Attribute Information:
 
     Id number: 1 to 214 (removed from CSV file)
