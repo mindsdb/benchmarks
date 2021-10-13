@@ -5,7 +5,7 @@ from benchmarks.datasets.dataset import DatasetInterface
 class Dataset(DatasetInterface):
     tags = ['business','finance', 'investing', 'exploratory', 'data analysis', 'regression']
     learn_kwargs = {}
-    num_folds = None
+    num_folds = 5
     accuracy_functions = [balanced_accuracy_score]
     file = 'data.csv'
     active = True
@@ -13,4 +13,4 @@ class Dataset(DatasetInterface):
     source = 'https://www.kaggle.com/lazycoder00/tcsdataset'
     license = 'CC0: Public Domain'
     is_open_license = True
-    num_folds = 5
+    
