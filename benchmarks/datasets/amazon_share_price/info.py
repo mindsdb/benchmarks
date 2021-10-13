@@ -13,3 +13,4 @@ class Dataset(DatasetInterface):
     source = 'https://www.kaggle.com/lazycoder00/tcsdataset'
     license = 'CC0: Public Domain'
     is_open_license = True
+    num_folds = 5
