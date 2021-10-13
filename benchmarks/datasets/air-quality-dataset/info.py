@@ -11,3 +11,9 @@ class Dataset(DatasetInterface):
     active = True
     target = 'Temperature'
     source = 'https://www.kaggle.com/fedesoriano/air-quality-data-set'
+    num_folds = None
+    learn_kwargs = {'timeseries_settings': {'order_by': ['CO(GT)'], 
+                                            'window': 24,
+                                            'nr_predictions': 12,
+                                            'use_previous_target': True}, 
+                    'advanced_args': {}}
