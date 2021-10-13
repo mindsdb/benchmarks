@@ -11,3 +11,9 @@ class Dataset(DatasetInterface):
     active = True
     target = 'Junction'
     source = 'https://www.kaggle.com/fedesoriano/traffic-prediction-dataset'
+    learn_kwargs = {'timeseries_settings': {'order_by': ['DateTime'], 
+                                            'window': 24,
+                                            'nr_predictions': 12,
+                                            'use_previous_target': True}, 
+                    'advanced_args': {} }
+    num_folds = None
