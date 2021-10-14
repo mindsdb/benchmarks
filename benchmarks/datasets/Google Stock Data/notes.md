@@ -1,4 +1,5 @@
-#Google Stock Data Dataset
+## Google Stock Data Dataset
+
 _Sources -> Yahoo Finance dataset_
 
 _Collection methodology -> This data was collected using historical tab under yahoo finance webpage._
