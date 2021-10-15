@@ -1,3 +1,5 @@
+`WARNING: We are currently *not* accepting public PRs with datasets until we have a better quality and rights reviews process in place, ideally automated. Please avoid making pull requests to this repository.`
+
 # Mindsdb Benchmark Suite
 
 Note: This suite is now available to the public but it is still meant to run internally. We will provide local setup instructions, as well as the database mirror needed to compare your results against our ongoing benchmarks very soon.
