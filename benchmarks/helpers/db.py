@@ -35,6 +35,7 @@ def setup_mysql():
         ,is_dev BOOL NOT NULL
         ,num_folds INT # When None => CV was not used
         ,accuracy_per_fold TEXT # When None => CV was not used
+        ,accuracy_per_mixer TEXT
         ,PRIMARY KEY(id)
     ) ENGINE=InnoDB""")
 

@@ -1,8 +1,10 @@
+import json
 from flask import Flask, render_template, redirect
+from flask.globals import g
 import numpy as np
 from benchmarks.frameworks import Framework_lightwood
 from flask import request
-
+import datetime
 
 app = Flask(__name__)
 
@@ -12,18 +14,43 @@ def index():
     return redirect('/accuracy_plots')
 
 
+def make_ul(heading, arr):
+    return f'''
+    <br>
+    <h4>{heading.capitalize()}</h4>
+    <ul><li>
+    {'</li><li>'.join(arr)}
+    </li></ul>
+    '''
+
+
+def get_local_group():
+    group = {}
+    try:
+        with open('REPORT.db', 'r') as fp:
+            for line in fp.readlines():
+                obj = json.loads(line)
+                obj['ran_at'] = datetime.datetime.now()
+                group[(obj['dataset'], obj['accuracy_function'])] = [obj]
+    except Exception:
+        pass
+    return group
+
+
 @app.route('/compare/<first>/<second>')
 def compare(first, second):
     # @TODO Add special "stable" case for comparing against the best accuracies across all of lightwood
     if first == 'best':
         first_group = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
     elif len(first.split('.')) == 3:
-        first_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': first})
+        first_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': first, 'is_dev': False})
     else:
         first_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_commit': first})
 
-    if len(second.split('.')) == 3:
-        second_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': second})
+    if second == 'local':
+        second_group = get_local_group()
+    elif len(second.split('.')) == 3:
+        second_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': second, 'is_dev': False})
     else:
         second_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_commit': second})
 
@@ -45,19 +72,23 @@ def compare(first, second):
 
     for (ds, af), res in second_group.items():
         second_group_dict[(ds, af)] = res[0]
-        
+
     missing = []
     equal = []
     worst = []
     better = []
+    dataset_print_dict = {}
+
     total_improvement = 0
     relative_total_improvement = 0
     for (ds, af) in first_group_dict:
         first_acc = first_group_dict[(ds, af)]['accuracy']
         second_acc = second_group_dict.get((ds, af), {'accuracy': None})['accuracy']
 
+        ds_str = f'Dataset: {ds} with accuracy function {af}'
         if second_acc is None:
-            missing.append((ds, af))
+            missing.append(ds_str)
+            improv = None
         else:
             
             if first_acc <= 0:
@@ -69,8 +100,7 @@ def compare(first, second):
                 relative_improv = (second_acc - first_acc) / first_acc
             
             relative_total_improvement += relative_improv
-            
-            
+               
             if first_acc < 1 and second_acc < 1:
                 improv = max(second_acc, 0) - max(first_acc, 0)
                 print(f'Improvement of {round(improv*100,2)}% (out of the max accuracy) for {ds}')
@@ -79,14 +109,31 @@ def compare(first, second):
                 improv = 0
                     
             total_improvement += improv
-            if np.abs(improv) < 0.05:
-                equal.append((ds, af))
+            if np.abs(improv) < 0.02:
+                equal.append(ds_str)
             elif second_acc > first_acc:
-                better.append((ds, af))
+                better.append(ds_str)
             elif second_acc < first_acc:
-                worst.append((ds, af))
+                worst.append(ds_str)
             else:
-                raise Exception(f'Something wrong for accuracyies {first_acc}, {second_acc}')
+                raise Exception(f'Something wrong for accuracies {first_acc}, {second_acc}')
+
+        if ds not in dataset_print_dict:
+            dataset_print_dict[ds] = []
+
+        first_acc_rnd = round(first_acc, 4)
+
+        if second_acc is None:
+            second_acc_rnd = 'Missing'
+        else:
+            second_acc_rnd = round(second_acc, 4)
+
+        if improv is None:
+            improv_rnd = 'Missing'
+        else:
+            improv_rnd = round(improv, 4)
+
+        dataset_print_dict[ds].append(f'Accuracy function {af} | Before: {first_acc_rnd} | Now: {second_acc_rnd} | Improvement: {improv_rnd}')
 
     total_improvement = 100 * (total_improvement / (len(worst) + len(better) + len(equal)))
     total_improvement = round(total_improvement, 2)
@@ -94,40 +141,54 @@ def compare(first, second):
     relative_total_improvement = 100 * (relative_total_improvement / (len(worst) + len(better) + len(equal)))
     relative_total_improvement = round(relative_total_improvement, 2)
 
-    release = ' No'
-    if relative_total_improvement >= -5 and total_improvement >= 0 and len(worst) == 0 and len(missing) == 0:
+    release_condition = 'relative_total_improvement >= -5 and total_improvement >= -1 and len(missing) == 0'
+
+    if eval(release_condition):
         release = 'Yes'
+        release_reason = 'Accuracy is good enough and no datasets are missing'
+    elif len(missing) > 0:
+        release = 'No'
+        release_reason = f' A total of {len(missing)} (datasets, accuracy function) tuples are missing'
+    else:
+        release = ' No'
+        release_reason = 'Aggregate accuracy is too low'
+
+    if first != 'best':
+        release = 'No'
+        release_reason = 'Release condition can only be determined when comparing against "best"'
+
 
     if request.args.get('release_only', False):
         return release
     else:
         return f"""
-            In short
+            <h1>Aggregate performance</h1>
+            <p>Absolute improvement: {total_improvement}%</p>
+            <p>Relative improvement: {relative_total_improvement}%</p>
+            <p>Should we releases this commit? {release}. Why? {release_reason}</p>
+            <p>A total of {len(missing)} datasets are missing</p>
+            <p>A total of {len(better)} datasets are performing better</p>
+            <p>A total of {len(worst)} datasets are performing worst</p>
+            <p>A total of {len(equal)} datasets are about the same</p>
             <br>
-            Total improvement: {total_improvement}% (diff as % of 1 for acc functions capped at 1, scores < 0 ignored)
+
+
+            <h2>Per dataset performance<h2>
+            {make_ul('Missing', missing)}
+            {make_ul('Equal', equal)}
+            {make_ul('Better', better)}
+            {make_ul('Worst', worst)}
+            {''.join([make_ul(ds, dataset_print_dict[ds]) for ds in dataset_print_dict])}
             <br>
-            Relative total improvement: {relative_total_improvement}% as % of first accuracy (marked as 100% if going from a negative to a positive score)
-            <br>
-            {len(missing)} missing
-            <br>
-            {len(equal)} equal
-            <br>
-            {len(worst)} worst
-            <br>
-            {len(better)} better
-            <br>
-            Should we releases? ---{release}---
-            <br>
-            <br>
-            Details:
-            <br>
-            Missing: {missing}
-            <br>
-            Worst: {worst}
-            <br>
-            Better: {better}
-            <br>
-            Equal: {equal}
+
+            
+            <h2>Reading the numbers</h2>
+            <p>All comparisons are done between the second commit-hash/version relative to the first</p>
+            <p>If the first item being compared is the string "best" this takes the best accuracy from all accuracies of all production runs of the benchmarks (which should be all lightwood release currently on pypi)</p>
+            <p>Absolute improvement is calculated as <code>Mean over all (datasource, accuracy) tuples of accuracy_second(datasource, accuracy) - accuracy_first(datasource, accuracy)</code> time 100 (to turn it into % points)</p>
+            <p>Relative improvement is calculated as <code>Mean over all (datasource, accuracy) tuples of (accuracy_second(datasource, accuracy) - accuracy_first(datasource, accuracy)) / accuracy_first(datasource, accuracy)</code> time 100 (to turn it into % points)</p>
+            <p>Release condition is: {release_condition} (Release is "Yes" if it evaluates to True)</p>
+            
         """
 
 
@@ -141,6 +202,11 @@ def vers_sort(item):
 @app.route('/accuracy_plots')
 def accuracy_plots():
     groups = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
+    local_groups = get_local_group()
+    for tup in groups:
+        if tup in local_groups:
+            groups[tup] += local_groups[tup]
+
     dct = {}
     for ds in list(set(g[0] for g in groups)):
         dct[ds] = {}

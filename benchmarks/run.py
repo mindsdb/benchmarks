@@ -18,6 +18,7 @@ from benchmarks.helpers.accuracy import requires_normal_predictions
 import torch
 import random
 import datetime
+import json
 
 CURRENT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
 DATASETS_DIR = os.path.join(CURRENT_DIR, os.path.join('benchmarks','datasets'))
@@ -27,6 +28,7 @@ def fit_and_infer_w_lightwood(df_train: pd.DataFrame, df_test: pd.DataFrame, pro
     import lightwood
     from lightwood import dtype
     from lightwood.api.high_level import predictor_from_problem
+    from lightwood import PredictionArguments
 
     def to_typed_list(lst: List, dtype: type) -> List:
         """
@@ -49,6 +51,11 @@ def fit_and_infer_w_lightwood(df_train: pd.DataFrame, df_test: pd.DataFrame, pro
     except KeyError:
         pass
 
+    all_mixer_predictions = predictor.predict(df_test, {'all_mixers': True})
+    predictions_per_mixer = {}
+    for column in all_mixer_predictions.columns:
+        predictions_per_mixer[column.replace('__mdb_mixer_', '')] = list(all_mixer_predictions[column])
+
     output = predictor.predict(df_test)
     predictions = list(output['prediction'])
     target = problem_definition['target']
@@ -64,7 +71,7 @@ def fit_and_infer_w_lightwood(df_train: pd.DataFrame, df_test: pd.DataFrame, pro
         predictions = to_typed_list(predictions, float)
         real_values = to_typed_list(real_values, float)
 
-    return predictions, real_values, int(time.time() - started)
+    return predictions, predictions_per_mixer, real_values, int(time.time() - started)
 
 
 def setup_args():
@@ -236,29 +243,36 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
 
         accuracy_map = {}
         accuracy_map_per_fold = {}
+        accuracy_per_mixer_map = {}
+        accuracy_per_mixer_per_fold_map = {}
 
         if 'timeseries' in ds.tags:
             df_train, df_test = ts_ds_to_train_test(ds)
-            predictions, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
+            predictions, predictions_per_mixer, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
             for accuracy_function in ds.accuracy_functions:
                 if accuracy_function not in requires_normal_predictions:
                     continue
                 accuracy_map[accuracy_function.__name__] = accuracy_function(real_values, predictions)
+                accuracy_per_mixer_map[accuracy_function.__name__] = {}
+                for mixer in predictions_per_mixer:
+                    accuracy_per_mixer_map[accuracy_function.__name__][mixer] = accuracy_function(real_values, predictions_per_mixer[mixer])
         
         elif ds.num_folds is None:
             folds = ds_to_folds(ds, 5)
-            predictions, real_values, runtime = fit_and_infer_w_lightwood(pd.concat(folds[:4]), folds[4], problem_definition)
+            predictions, predictions_per_mixer, real_values, runtime = fit_and_infer_w_lightwood(pd.concat(folds[:4]), folds[4], problem_definition)
             for accuracy_function in ds.accuracy_functions:
                 if accuracy_function not in requires_normal_predictions:
                     continue
                 accuracy_map[accuracy_function.__name__] = accuracy_function(real_values, predictions)
-
+                accuracy_per_mixer_map[accuracy_function.__name__] = {}
+                for mixer in predictions_per_mixer:
+                    accuracy_per_mixer_map[accuracy_function.__name__][mixer] = accuracy_function(real_values, predictions_per_mixer[mixer])
         else:
             folds = ds_to_folds(ds, ds.num_folds)
             for i in range(len(folds)):
                 df_test = folds[i]
                 df_train = pd.concat(folds[:i] + folds[i+1:])
-                predictions, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
+                predictions, predictions_per_mixer, real_values, runtime = fit_and_infer_w_lightwood(df_train, df_test, problem_definition)
                 
                 for accuracy_function in ds.accuracy_functions:
                     if accuracy_function not in requires_normal_predictions:
@@ -266,10 +280,21 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
                     if accuracy_function.__name__ not in accuracy_map_per_fold:
                         accuracy_map_per_fold[accuracy_function.__name__] = []
                     accuracy_map_per_fold[accuracy_function.__name__].append(accuracy_function(real_values, predictions))
-            
+
+                    if accuracy_function.__name__ not in accuracy_per_mixer_per_fold_map:
+                        accuracy_per_mixer_per_fold_map[accuracy_function.__name__] = {}
+                        for mixer in predictions_per_mixer:
+                            accuracy_per_mixer_per_fold_map[accuracy_function.__name__][mixer] = []
+                    for mixer in predictions_per_mixer:
+                        accuracy_per_mixer_per_fold_map[accuracy_function.__name__][mixer].append(accuracy_function(real_values, predictions_per_mixer[mixer]))
+
             for k in accuracy_map_per_fold:
                 accuracy_map[k] = np.mean(accuracy_map_per_fold[k])
-   
+
+            for k in accuracy_per_mixer_per_fold_map:
+                for mixer in accuracy_per_mixer_per_fold_map[k]:
+                    accuracy_per_mixer_map = np.mean(accuracy_per_mixer_per_fold_map[k][mixer])
+
         for accuracy_function_name in accuracy_map:
             accuracy = accuracy_map[accuracy_function_name]
             accuracy_per_fold = None
@@ -278,23 +303,29 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
 
             print(f'\n\nGot accuracy: {accuracy} ({accuracy_function_name}) [per fold: {accuracy_per_fold}] for {ds.name}\n\n')
 
-            q = 'INSERT INTO benchmarks.v4 (dataset, accuracy, accuracy_function, runtime, lightwood_version, lightwood_commit, is_dev, num_folds, accuracy_per_fold) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+            insert_map = {
+                'dataset': ds.name,
+                'accuracy': accuracy,
+                'accuracy_function': accuracy_function_name,
+                'runtime': runtime,
+                'lightwood_version': lightwood_version,
+                'lightwood_commit': lightwood_commit,
+                'is_dev': is_dev,
+                'num_folds': ds.num_folds,
+                'accuracy_per_fold': accuracy_per_fold,
+                'accuracy_per_mixer': json.dumps(accuracy_per_mixer_map)
+            }
+
+            q = f'INSERT INTO benchmarks.v4 ({",".join(list(insert_map.keys()))}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
 
             if use_db:
                 con, cur, _ = get_mysql()
-                cur.execute(q, (
-                    ds.name,
-                    accuracy,
-                    accuracy_function_name,
-                    runtime,
-                    lightwood_version,
-                    lightwood_commit,
-                    is_dev,
-                    ds.num_folds,
-                    accuracy_per_fold
-                ))
+                cur.execute(q, list(insert_map.values()))
                 con.commit()
                 con.close()
+            with open('REPORT.db', 'a') as fp:
+                fp.write(json.dumps(insert_map))
+
             with open('REPORT.md', 'a') as fp:
                 fp.write(f'\n\n### {ds.name}  -  {accuracy_function_name}')
                 fp.write(f'\nAccuracy: {accuracy}')
@@ -303,6 +334,7 @@ def run_dataset(ds: DatasetInterface, lightwood_version: str, accuracy_data: dic
                 fp.write(f'\nVersion : {lightwood_version}')
                 fp.write(f'\nNum folds : {ds.num_folds}')
                 fp.write(f'\nPer-fold accuracy : {accuracy_per_fold}')
+                fp.write(f'\nPredictions per mixer: {accuracy_per_mixer_map}')
 
         print(f'Inserted results for dataset {ds.name}')
     except Exception as e:
@@ -324,6 +356,9 @@ def main():
     with open('REPORT.md', 'w') as fp:
         now = str(datetime.datetime.now()).split('.')[0]   
         fp.write(f'# Benchmark report\n\nRan on: {now}\nDatasets: {[x.name for x in args.datasets]}')
+
+    with open('REPORT.db', 'w') as fp:
+        fp.write('')
 
     print('=' * 20)
     
