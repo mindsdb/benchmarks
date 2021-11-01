@@ -7,6 +7,16 @@ from sklearn.metrics import r2_score as sk_r2_score, accuracy_score as r2_accura
 
 def r2_score(y_true, y_pred) -> float:
     """ Wrapper for sklearn R2 score, lower capped at 0. """
+    for arr in (y_true, y_pred):
+        for i in range(len(arr)):
+            try:
+                if arr[i] is None or np.isnan(arr[i]):
+                    arr[i] = 0
+                if np.isinf(arr[i]):
+                    arr[i] = pow(2, 63)
+            except Exception as e:
+                print(f'Strange value {arr[i]} caused exception: {e}')
+                arr[i] = 0
     acc = sk_r2_score(y_true, y_pred)
     return max(0, acc)
 
@@ -149,7 +159,7 @@ def quantile_correctness(y_pred, bounds) -> float:
     hits = [x[0] <= y <= x[1] for x, y in zip(bounds, y_pred)]
     return np.mean(hits)
 
-    
+
 requires_normal_predictions = [r2_score, accuracy_score, balanced_accuracy_score, inverse_reverse_smape, array_r2_score]
 requires_predict_proba = [log_loss, roc_auc, precssion_recall_score, weighted_log_loss]
 requires_confidence_rang = [binary_range_accuracy, delta_weighted_range_score]

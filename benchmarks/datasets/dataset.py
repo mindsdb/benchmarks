@@ -35,7 +35,8 @@ class DatasetInterface():
                 errors.append(f'Missing required field: {field}')
         
         for tag in self.tags:
-            if tag not in ['classification', 'regression', 'text', 'timeseries']:
+            if tag not in ['classification', 'regression', 'text', 'timeseries', 'physics', 'images', 'audio', 
+                           'chemistry', 'molecular biology', 'medicine', 'banking']:
                 errors.append(f'Unkown tag: {tag}')
         if len(errors) > 0:
             exp = f'Got the following errors for {self.name}:\n*' + '\n*'.join(errors) + '\n---------------------\n'

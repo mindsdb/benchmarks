@@ -40,7 +40,14 @@ def get_local_group():
 @app.route('/compare/<first>/<second>')
 def compare(first, second):
     # @TODO Add special "stable" case for comparing against the best accuracies across all of lightwood
-    if first == 'best':
+    multiversion = False
+    last = None
+    if first == 'best_of_all_time':
+        multiversion = True
+        first_group = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
+    elif first.startswith('last_'):
+        multiversion = True
+        last = int(first.replace('last_', ''))
         first_group = Framework_lightwood().get_accuracy_groups(filter_on={'is_dev': False})
     elif len(first.split('.')) == 3:
         first_group = Framework_lightwood().get_accuracy_groups(filter_on={'lightwood_version': first, 'is_dev': False})
@@ -60,15 +67,25 @@ def compare(first, second):
     first_group_dict = {}
     second_group_dict = {}
 
+    dct = {}
     for (ds, af), res in first_group.items():
-        max_res = 0
-        for r in res:
-            if first == 'best' and r['lightwood_version'] == 'Native 2.48.0':
-                continue
-            if r['lightwood_version'] != second and r['lightwood_commit'] != second:
-                if r['accuracy'] > max_res:
-                    max_res = r['accuracy']
-                    first_group_dict[(ds, af)] = r
+        if ds not in dct:
+            dct[ds] = {}
+        if last is not None:
+            dct[ds][af] = sorted(res, key=vers_sort)[-last:]
+        else:
+            dct[ds][af] = res
+
+    for ds in dct:
+        for af in dct[ds]:
+            max_res = 0
+            for r in dct[ds][af]:
+                if multiversion and r['lightwood_version'] == 'Native 2.48.0':
+                    continue
+                if r['lightwood_version'] != second and r['lightwood_commit'] != second:
+                    if r['accuracy'] > max_res:
+                        max_res = r['accuracy']
+                        first_group_dict[(ds, af)] = r
 
     for (ds, af), res in second_group.items():
         second_group_dict[(ds, af)] = res[0]
@@ -152,11 +169,6 @@ def compare(first, second):
     else:
         release = ' No'
         release_reason = 'Aggregate accuracy is too low'
-
-    if first != 'best':
-        release = 'No'
-        release_reason = 'Release condition can only be determined when comparing against "best"'
-
 
     if request.args.get('release_only', False):
         return release

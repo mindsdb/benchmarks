@@ -1,0 +1,1 @@
+The only and only cifar100, train/test split in the dirs will not be respected by the benchmarks, but we could change that, I guess, if we ever wanted to compare more fairly against paperswithcode.

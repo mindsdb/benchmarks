@@ -85,7 +85,7 @@ class BaseFramework():
             ', '.join(group_columns + extra_columns)
         )
 
-        con, cur, cfg = get_mysql()
+        con, cur, cfg = get_mysql('read')
         print(q)
         cur.execute(q)
         rows = cur.fetchall()

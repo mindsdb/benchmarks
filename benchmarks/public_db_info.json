@@ -3,6 +3,6 @@
     "host": "benchmark-database.cwoyhfn6bzs0.us-east-1.rds.amazonaws.com",
     "user": "public_reader",
     "password": "zrj2a4LvRVrmmd9YPOZXTYCvRQPdzkNvwN9BpnQ2Esk",
-    "database": "benchmarks",
+    "database": "benchmarks"
   }
 }

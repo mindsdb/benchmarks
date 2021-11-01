@@ -1,0 +1,1 @@
+From the NAS-Bench-360, we should consider using more of their datasets, but most are quite large, even this one is hefty at 379M. This is a good test for the array encoder.

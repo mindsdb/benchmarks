@@ -4,8 +4,11 @@ import benchmarks
 import MySQLdb
 
 
-def get_mysql():
-    db_info_path = os.path.join(os.path.dirname(os.path.abspath(benchmarks.__file__)), 'db_info.json')
+def get_mysql(mode='write'):
+    if mode == 'write':
+        db_info_path = os.path.join(os.path.dirname(os.path.abspath(benchmarks.__file__)), 'db_info.json')
+    else:
+        db_info_path = os.path.join(os.path.dirname(os.path.abspath(benchmarks.__file__)), 'public_db_info.json')
 
     with open(db_info_path, 'rb') as fp:
         cfg = json.load(fp)
