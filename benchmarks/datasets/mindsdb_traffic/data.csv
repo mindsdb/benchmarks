@@ -1542,8 +1542,8 @@ Month of the year,Medium,Source,Full Referrer,Referral Path,Event Category,Event
 7,referral,github.com,github.com/mindsdb/mindsdb/blob/main/README.md,/mindsdb/mindsdb/blob/main/README.md,Github,CTA-Clicks,1,1,0,356,1,3,3,1
 7,referral,github.com,github.com/mindsdb/mindsdb/blob/main/README.md,/mindsdb/mindsdb/blob/main/README.md,Scroll_depth,gtm.scrollDepth,1,2,0,369,0,6,3,0
 7,referral,github.com,github.com/mindsdb/mindsdb/issues/560,/mindsdb/mindsdb/issues/560,Scroll_depth,gtm.scrollDepth,2,2,0,394,0,4,2,0
-7,referral,github.com,github.com/mindsdb/mindsdb/tree/stable/mindsdb,/mindsdb/mindsdb/tree/stable/mindsdb,Lead,Initate White Paper Download,1,1,0,155,0,3,3,0
-7,referral,github.com,github.com/mindsdb/mindsdb/tree/stable/mindsdb,/mindsdb/mindsdb/tree/stable/mindsdb,Scroll_depth,gtm.scrollDepth,2,2,0,192,0,4,2,0
+7,referral,github.com,github.com/mindsdb/mindsdb/tree/main/mindsdb,/mindsdb/mindsdb/tree/main/mindsdb,Lead,Initate White Paper Download,1,1,0,155,0,3,3,0
+7,referral,github.com,github.com/mindsdb/mindsdb/tree/main/mindsdb,/mindsdb/mindsdb/tree/main/mindsdb,Scroll_depth,gtm.scrollDepth,2,2,0,192,0,4,2,0
 7,referral,glassdoor.com,glassdoor.com/admin/dataMgmt/employer/edit_input.htm,/admin/dataMgmt/employer/edit_input.htm,Lead,Initate Lead,1,1,0,120,1,7,7,0
 7,referral,glassdoor.com,glassdoor.com/admin/dataMgmt/employer/edit_input.htm,/admin/dataMgmt/employer/edit_input.htm,Scroll_depth,gtm.scrollDepth,1,2,0,121,0,8,4,0
 7,referral,hexometer.com,hexometer.com/,/,Scroll_depth,gtm.scrollDepth,1,1,0,3,0,1,1,0
